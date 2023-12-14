@@ -9,13 +9,13 @@ import (
 	"go.viam.com/utils"
 
 	// Package name from "module path"/subfolder of the package
-	mycamera "viam-soleng/my-first-component/src/cameras"
+	mycamera "felixreichenbach/objectfilter/src/cameras"
 )
 
 func main() {
 	// NewLoggerFromArgs will create a logging.Logger at "DebugLevel" if
 	// "--log-level=debug" is an argument in os.Args and at "InfoLevel" otherwise.
-	utils.ContextualMain(mainWithArgs, module.NewLoggerFromArgs("My Go FilterCam Module"))
+	utils.ContextualMain(mainWithArgs, module.NewLoggerFromArgs("My Objectfilter Module"))
 }
 
 func mainWithArgs(ctx context.Context, args []string, logger logging.Logger) (err error) {

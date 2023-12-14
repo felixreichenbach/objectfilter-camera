@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"image"
-	"slices"
 
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/gostream"
@@ -135,7 +134,9 @@ func (fs filterStream) Next(ctx context.Context) (image.Image, func(), error) {
 	if len(detections) > 0 {
 		var boxes []objectdetection.Detection
 		for _, detection := range detections {
-			if (slices.Contains(fs.fc.conf.Labels, detection.Label())) && (detection.Score() >= fs.fc.conf.Confidence) {
+			if (contains(fs.fc.conf.Labels, detection.Label())) && (detection.Score() >= fs.fc.conf.Confidence) {
+				// to be simplified with go version 1.21 which will introduce the slices package:
+				//if (slices.Contains(fs.fc.conf.Labels, detection.Label())) && (detection.Score() >= fs.fc.conf.Confidence) {
 				boxes = append(boxes, detection)
 			}
 		}
@@ -147,6 +148,15 @@ func (fs filterStream) Next(ctx context.Context) (image.Image, func(), error) {
 		return modifiedImage, release, nil
 	}
 	return image, release, nil
+}
+
+func contains(labels []string, label string) bool {
+	for _, listlabel := range labels {
+		if listlabel == label {
+			return true
+		}
+	}
+	return false
 }
 
 // Object filter camera constructor.
