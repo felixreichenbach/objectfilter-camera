@@ -1,0 +1,13 @@
+{
+  "module_id": "felixreichenbach:object-filter",
+  "visibility": "public",
+  "url": "https://github.com/felixreichenbach/objectfilter-camera",
+  "description": "A Viam camera module which filters objects based upon a Viam object detector vision service.",
+  "models": [
+    {
+      "api": "rdk:component:camera",
+      "model": "felixreichenbach:camera:objectfilter"
+    }
+  ],
+  "entrypoint": "bin/objectfilter"
+}
