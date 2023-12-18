@@ -38,4 +38,4 @@ Simply provide the key/value pair as follows:
 ```
 
 The vision service must be contained in the list of the object filter component configuration "vision_services" attribute.
-You can use "client.py" with your smart machine credentials to test it.
+You can use "client.py" with your smart machine credentials to test it ```python client.py <service-name>```.
