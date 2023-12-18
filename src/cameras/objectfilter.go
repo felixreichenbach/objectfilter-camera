@@ -44,7 +44,6 @@ func (cfg *Config) Validate(path string) ([]string, error) {
 	if cfg.Camera == "" {
 		return nil, utils.NewConfigValidationFieldRequiredError(path, "camera")
 	}
-
 	if len(cfg.VisionServices) == 0 {
 		return nil, utils.NewConfigValidationFieldRequiredError(path, "vision_services")
 	}
@@ -55,6 +54,7 @@ func (cfg *Config) Validate(path string) ([]string, error) {
 
 // The actual object filter camera
 type filterCamera struct {
+	resource.Named
 	resource.AlwaysRebuild
 	resource.TriviallyCloseable
 
@@ -65,11 +65,6 @@ type filterCamera struct {
 	cam         camera.Camera
 	vis         vision.Service
 	visServices map[string]vision.Service
-}
-
-// Returns the camera component name
-func (fc *filterCamera) Name() resource.Name {
-	return fc.name
 }
 
 // Returns the unfiltered source camera images
@@ -106,7 +101,6 @@ func (fc *filterCamera) Stream(ctx context.Context, errHandlers ...gostream.Erro
 	if err != nil {
 		return nil, err
 	}
-
 	return filterStream{camStream, fc}, nil
 }
 
@@ -115,14 +109,8 @@ type filterStream struct {
 	fc           *filterCamera
 }
 
-// Closes the image stream
-func (fs filterStream) Close(ctx context.Context) error {
-	return fs.cameraStream.Close(ctx)
-}
-
 // Gets the next image from the image stream
 func (fs filterStream) Next(ctx context.Context) (image.Image, func(), error) {
-
 	image, release, err := fs.cameraStream.Next(ctx)
 	if err != nil {
 		return nil, nil, err
@@ -132,17 +120,14 @@ func (fs filterStream) Next(ctx context.Context) (image.Image, func(), error) {
 	if err != nil {
 		return nil, nil, err
 	}
-
 	if len(detections) > 0 {
 		var boxes []objectdetection.Detection
 		for _, detection := range detections {
-			//if (contains(fs.fc.conf.Labels, detection.Label())) && (detection.Score() >= fs.fc.conf.Confidence) {
-			// to be simplified with go version 1.21 which will introduce the slices package:
 			if (slices.Contains(fs.fc.conf.Labels, detection.Label())) && (detection.Score() >= fs.fc.conf.Confidence) {
 				boxes = append(boxes, detection)
 			}
 		}
-		// overlay only the configured detections onto the source image
+		// Overlay only the selected / configured detection labels and boxes onto the source image
 		modifiedImage, err := objectdetection.Overlay(image, boxes)
 		if err != nil {
 			return nil, nil, fmt.Errorf("could not overlay bounding boxes: %w", err)
@@ -152,21 +137,13 @@ func (fs filterStream) Next(ctx context.Context) (image.Image, func(), error) {
 	return image, release, nil
 }
 
-/*
-Replacement function for missing "slices" of earlier go versions
-func contains(labels []string, label string) bool {
-	for _, listlabel := range labels {
-		if listlabel == label {
-			return true
-		}
-	}
-	return false
+// Closes the image stream
+func (fs filterStream) Close(ctx context.Context) error {
+	return fs.cameraStream.Close(ctx)
 }
-*/
 
 // Constructor for the object filter camera
 func newCamera(ctx context.Context, deps resource.Dependencies, conf resource.Config, logger logging.Logger) (camera.Camera, error) {
-
 	newConf, err := resource.NativeConfig[*Config](conf)
 	if err != nil {
 		return nil, err
