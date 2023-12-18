@@ -30,9 +30,9 @@ var Model = resource.NewModel("felixreichenbach", "camera", "objectfilter")
 type Config struct {
 	// The raw camera source
 	Camera string
-	// The vision service for labeling
-	Vision string
-	// Optional: The labels to extracted. Default = all.
+	// List of vision services
+	VisionServices []string `json:"vision_services"`
+	// Optional: The labels to extracted. Default = none.
 	Labels []string `json:"labels"`
 	// Optional: The confidence threshold
 	Confidence float64 `json:"confidence"`
@@ -45,10 +45,15 @@ func (cfg *Config) Validate(path string) ([]string, error) {
 		return nil, utils.NewConfigValidationFieldRequiredError(path, "camera")
 	}
 
-	if cfg.Vision == "" {
-		return nil, utils.NewConfigValidationFieldRequiredError(path, "vision")
+	if len(cfg.VisionServices) == 0 {
+		return nil, utils.NewConfigValidationFieldRequiredError(path, "vision_services")
 	}
-	return []string{cfg.Camera, cfg.Vision}, nil
+
+	impDeps := cfg.VisionServices
+	impDeps = append(impDeps, cfg.Camera)
+	//impDeps = append(impDeps, cfg.Vision)
+	return impDeps, nil
+	//return []string{cfg.Camera, cfg.Vision, cfg.VisionServices}, nil
 }
 
 // The object filter camera
@@ -60,8 +65,9 @@ type filterCamera struct {
 	conf   *Config
 	logger logging.Logger
 
-	cam camera.Camera
-	vis vision.Service
+	cam         camera.Camera
+	vis         vision.Service
+	visServices map[string]vision.Service
 }
 
 // Name implements camera.Camera.
@@ -174,15 +180,24 @@ func newCamera(ctx context.Context, deps resource.Dependencies, conf resource.Co
 		return nil, err
 	}
 
-	fc.vis, err = vision.FromDependencies(deps, newConf.Vision)
-	if err != nil {
-		return nil, err
+	fc.visServices = make(map[string]vision.Service)
+
+	for _, visionService := range newConf.VisionServices {
+		fc.logger.Infof("VISION_SERVICE: %s", visionService)
+		fc.visServices[visionService], err = vision.FromDependencies(deps, visionService)
+		if err != nil {
+			return nil, err
+		}
 	}
-
+	fc.vis = fc.visServices[newConf.VisionServices[0]]
 	return fc, nil
-
 }
 
 func (fc *filterCamera) DoCommand(ctx context.Context, cmd map[string]interface{}) (map[string]interface{}, error) {
-	return nil, resource.ErrDoUnimplemented
+	val, ok := cmd["vision-service"].(string)
+	if ok {
+		fc.vis = fc.visServices[val]
+		return map[string]interface{}{"result": fmt.Sprintf("Vision service changed to: %s", val)}, nil
+	}
+	return nil, fmt.Errorf("vision service could not be changed to: %s", val)
 }
