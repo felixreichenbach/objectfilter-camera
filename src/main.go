@@ -9,13 +9,16 @@ import (
 	"go.viam.com/utils"
 
 	// Package name from "module path"/subfolder of the package
-	mycamera "viam-soleng/my-first-component/src/cameras"
+	objectfilter "felixreichenbach/objectfilter/src/cameras"
 )
+
+// Holds the module version
+var Version string
 
 func main() {
 	// NewLoggerFromArgs will create a logging.Logger at "DebugLevel" if
 	// "--log-level=debug" is an argument in os.Args and at "InfoLevel" otherwise.
-	utils.ContextualMain(mainWithArgs, module.NewLoggerFromArgs("My Go FilterCam Module"))
+	utils.ContextualMain(mainWithArgs, module.NewLoggerFromArgs("My Objectfilter Module v"+Version))
 }
 
 func mainWithArgs(ctx context.Context, args []string, logger logging.Logger) (err error) {
@@ -27,7 +30,7 @@ func mainWithArgs(ctx context.Context, args []string, logger logging.Logger) (er
 
 	// Models and APIs add helpers to the registry during their init().
 	// They can then be added to the module here.
-	err = myMod.AddModelFromRegistry(ctx, camera.API, mycamera.Model)
+	err = myMod.AddModelFromRegistry(ctx, camera.API, objectfilter.Model)
 	if err != nil {
 		return err
 	}

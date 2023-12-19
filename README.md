@@ -17,7 +17,7 @@ You can also find the module in the Viam registry directly: [https://app.viam.co
         ],
         "confidence": <-Your Confidence Threshold (e.g. 0.1)->
         "camera": "<-Your Camera Name->",
-        "vision": "<-Your Vision Service->"
+        "vision_services": ["<-Your List OfVision Services->"]
       },
       "depends_on": [
         "<-Your Camera Name->",
@@ -27,3 +27,15 @@ You can also find the module in the Viam registry directly: [https://app.viam.co
       "model": "felixreichenbach:camera:objectfilter"
     }
 ```
+
+## Dynamically Choose Vision Service
+
+The object filter camera supports changing the vision service applied to the source images dynamically via "do_command".
+Simply provide the key/value pair as follows:
+
+```
+{"vision-service": "<-YOUR SERVICE NAME->}
+```
+
+The vision service must be contained in the list of the object filter component configuration "vision_services" attribute.
+You can use "client.py" with your smart machine credentials to test it ```python client.py <service-name>```.
