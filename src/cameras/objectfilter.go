@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"image"
-	"slices"
 
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/gostream"
@@ -123,7 +122,14 @@ func (fs filterStream) Next(ctx context.Context) (image.Image, func(), error) {
 	if len(detections) > 0 {
 		var boxes []objectdetection.Detection
 		for _, detection := range detections {
+			/* To be added once slices becomes available in current go version
 			if (slices.Contains(fs.fc.conf.Labels, detection.Label())) && (detection.Score() >= fs.fc.conf.Confidence) {
+				boxes = append(boxes, detection)
+			}
+			*/
+			if (contains(fs.fc.conf.Labels, detection.Label())) && (detection.Score() >= fs.fc.conf.Confidence) {
+				// to be simplified with go version 1.21 which will introduce the slices package:
+				//if (slices.Contains(fs.fc.conf.Labels, detection.Label())) && (detection.Score() >= fs.fc.conf.Confidence) {
 				boxes = append(boxes, detection)
 			}
 		}
@@ -173,4 +179,14 @@ func (fc *filterCamera) DoCommand(ctx context.Context, cmd map[string]interface{
 		return map[string]interface{}{"result": fmt.Sprintf("Vision service changed to: %s", val)}, nil
 	}
 	return nil, fmt.Errorf("vision service could not be changed to: %s", val)
+}
+
+// Workaround for missing slices package in current go version
+func contains(labels []string, label string) bool {
+	for _, listlabel := range labels {
+		if listlabel == label {
+			return true
+		}
+	}
+	return false
 }
