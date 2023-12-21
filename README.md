@@ -5,27 +5,15 @@ You can find information regarding how to deploy Viam modules on to your smart m
 
 You can also find the module in the Viam registry directly: [https://app.viam.com/module/felixreichenbach/object-filter](https://app.viam.com/module/felixreichenbach/object-filter)
 
-## Component Configuration
+## Component Attributes Configuration
 
 ```
-    {
-      "type": "camera",
-      "namespace": "rdk",
-      "attributes": {
-        "labels": [
-          "<-The Label(s) You Are Looking For->"
-        ],
+        "camera": "<-Your Source Camera Name->",
+        "labels": ["<-The Label(s) You Are Looking For->"],
         "confidence": <-Your Confidence Threshold (e.g. 0.1)->
-        "camera": "<-Your Camera Name->",
-        "vision_services": ["<-Your List OfVision Services->"]
-      },
-      "depends_on": [
-        "<-Your Camera Name->",
-        "<-Your Vision Service->"
-      ],
-      "name": "filtercam",
-      "model": "felixreichenbach:camera:objectfilter"
-    }
+        "vision_services": ["<-Your List Of Vision Services->"],
+        "display_boxes":  true,
+        "filter_data": true
 ```
 
 ## Dynamically Choose Vision Service
