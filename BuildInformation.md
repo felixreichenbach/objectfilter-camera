@@ -2,7 +2,7 @@
 
 
 
-Build Binary
+# Go Build
 
 ```
 go build -ldflags '-X main.Version=0.4.0 -extldflags "-static"' -o ./bin/objectfilter ./src
