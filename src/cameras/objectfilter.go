@@ -8,8 +8,10 @@ import (
 	"context"
 	"fmt"
 	"image"
+	"slices"
 
 	"go.viam.com/rdk/components/camera"
+	"go.viam.com/rdk/data"
 	"go.viam.com/rdk/gostream"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/pointcloud"
@@ -36,6 +38,10 @@ type Config struct {
 	Labels []string `json:"labels"`
 	// Optional: The confidence threshold
 	Confidence float64 `json:"confidence"`
+	// Display bounding boxes or raw camera stream
+	DisplayBoxes bool `json:"display_boxes"`
+	// Activate/deactivate data recording filtering
+	FilterData bool `json:"filter_data"`
 }
 
 // Configuration information validation, returning implicit dependencies.
@@ -72,21 +78,21 @@ func newObjectFilter(ctx context.Context, deps resource.Dependencies, conf resou
 	if err != nil {
 		return nil, err
 	}
-	fc := &objectFilter{name: conf.ResourceName(), conf: newConf, logger: logger}
-	fc.camera, err = camera.FromDependencies(deps, newConf.Camera)
+	of := &objectFilter{name: conf.ResourceName(), conf: newConf, logger: logger}
+	of.camera, err = camera.FromDependencies(deps, newConf.Camera)
 	if err != nil {
 		return nil, err
 	}
-	fc.visionServices = make(map[string]vision.Service)
+	of.visionServices = make(map[string]vision.Service)
 	for _, visionService := range newConf.VisionServices {
-		fc.logger.Infof("VISION_SERVICE: %s", visionService)
-		fc.visionServices[visionService], err = vision.FromDependencies(deps, visionService)
+		of.logger.Infof("VISION_SERVICE: %s", visionService)
+		of.visionServices[visionService], err = vision.FromDependencies(deps, visionService)
 		if err != nil {
 			return nil, err
 		}
 	}
-	fc.visionService = fc.visionServices[newConf.VisionServices[0]]
-	return fc, nil
+	of.visionService = of.visionServices[newConf.VisionServices[0]]
+	return of, nil
 }
 
 // Returns the unfiltered source camera images
@@ -128,42 +134,42 @@ func (of *objectFilter) Stream(ctx context.Context, errHandlers ...gostream.Erro
 
 type filterStream struct {
 	cameraStream gostream.VideoStream
-	fc           *objectFilter
+	of           *objectFilter
 }
 
 // Gets the next image from the image stream
 func (fs filterStream) Next(ctx context.Context) (image.Image, func(), error) {
-	image, release, err := fs.cameraStream.Next(ctx)
+	// Get next camera img
+	img, release, err := fs.cameraStream.Next(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
 	// Provide image to vision service and get object detections
-	detections, err := fs.fc.visionService.Detections(ctx, image, nil)
+	detections, err := fs.of.visionService.Detections(ctx, img, nil)
 	if err != nil {
 		return nil, nil, err
 	}
-	if len(detections) > 0 {
-		var boxes []objectdetection.Detection
-		for _, detection := range detections {
-			/* To be added once slices becomes available in current go version
-			if (slices.Contains(fs.fc.conf.Labels, detection.Label())) && (detection.Score() >= fs.fc.conf.Confidence) {
-				boxes = append(boxes, detection)
-			}
-			*/
-			if (contains(fs.fc.conf.Labels, detection.Label())) && (detection.Score() >= fs.fc.conf.Confidence) {
-				// to be simplified with go version 1.21 which will introduce the slices package:
-				//if (slices.Contains(fs.fc.conf.Labels, detection.Label())) && (detection.Score() >= fs.fc.conf.Confidence) {
-				boxes = append(boxes, detection)
-			}
+	// Filter the detected labels according to the filter configuration
+	var relevantdDetections []objectdetection.Detection
+	for _, detection := range detections {
+		if (slices.Contains(fs.of.conf.Labels, detection.Label())) && (detection.Score() >= fs.of.conf.Confidence) {
+			relevantdDetections = append(relevantdDetections, detection)
 		}
-		// Overlay only the selected / configured detection labels and boxes onto the source image
-		modifiedImage, err := objectdetection.Overlay(image, boxes)
-		if err != nil {
-			return nil, nil, fmt.Errorf("could not overlay bounding boxes: %w", err)
-		}
-		return modifiedImage, release, nil
 	}
-	return image, release, nil
+	// In the case of a data manager request, no relevant detections and data filtering true return no capture
+	if (ctx.Value(data.FromDMContextKey{}) == true) && (len(relevantdDetections) == 0) && fs.of.conf.FilterData {
+		return nil, release, data.ErrNoCaptureToStore
+	}
+	// Overlay only the selected / configured detection labels and boxes onto the source image
+	if (len(relevantdDetections) > 0) && fs.of.conf.DisplayBoxes {
+		modImg, err := objectdetection.Overlay(img, relevantdDetections)
+		if err != nil {
+			return nil, release, fmt.Errorf("could not overlay bounding boxes: %w", err)
+		}
+		return modImg, release, nil
+	}
+	// return raw image
+	return img, release, nil
 }
 
 // Closes the image stream
@@ -179,14 +185,4 @@ func (of *objectFilter) DoCommand(ctx context.Context, cmd map[string]interface{
 		return map[string]interface{}{"result": fmt.Sprintf("Vision service changed to: %s", val)}, nil
 	}
 	return nil, fmt.Errorf("vision service could not be changed to: %s", val)
-}
-
-// Workaround for missing slices package in current go version
-func contains(labels []string, label string) bool {
-	for _, listlabel := range labels {
-		if listlabel == label {
-			return true
-		}
-	}
-	return false
 }
