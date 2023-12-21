@@ -52,7 +52,7 @@ func (cfg *Config) Validate(path string) ([]string, error) {
 }
 
 // The actual object filter camera
-type filterCamera struct {
+type objectFilter struct {
 	resource.Named
 	resource.AlwaysRebuild
 	resource.TriviallyCloseable
@@ -67,8 +67,8 @@ type filterCamera struct {
 }
 
 // Returns the unfiltered source camera images
-func (fc *filterCamera) Images(ctx context.Context) ([]camera.NamedImage, resource.ResponseMetadata, error) {
-	images, meta, err := fc.cam.Images(ctx)
+func (of *objectFilter) Images(ctx context.Context) ([]camera.NamedImage, resource.ResponseMetadata, error) {
+	images, meta, err := of.cam.Images(ctx)
 	if err != nil {
 		return images, meta, err
 	}
@@ -76,18 +76,18 @@ func (fc *filterCamera) Images(ctx context.Context) ([]camera.NamedImage, resour
 }
 
 // Object filter camera does not implement PointClouds
-func (*filterCamera) NextPointCloud(ctx context.Context) (pointcloud.PointCloud, error) {
+func (*objectFilter) NextPointCloud(ctx context.Context) (pointcloud.PointCloud, error) {
 	return nil, resource.ErrDoUnimplemented
 }
 
 // TODO: What does this API do?
-func (fc *filterCamera) Projector(ctx context.Context) (transform.Projector, error) {
-	return fc.cam.Projector(ctx)
+func (of *objectFilter) Projector(ctx context.Context) (transform.Projector, error) {
+	return of.cam.Projector(ctx)
 }
 
 // Returns the camera's supported properties
-func (fc *filterCamera) Properties(ctx context.Context) (camera.Properties, error) {
-	p, err := fc.cam.Properties(ctx)
+func (of *objectFilter) Properties(ctx context.Context) (camera.Properties, error) {
+	p, err := of.cam.Properties(ctx)
 	if err == nil {
 		p.SupportsPCD = false
 	}
@@ -95,17 +95,17 @@ func (fc *filterCamera) Properties(ctx context.Context) (camera.Properties, erro
 }
 
 // The camera image stream
-func (fc *filterCamera) Stream(ctx context.Context, errHandlers ...gostream.ErrorHandler) (gostream.VideoStream, error) {
-	camStream, err := fc.cam.Stream(ctx, errHandlers...)
+func (of *objectFilter) Stream(ctx context.Context, errHandlers ...gostream.ErrorHandler) (gostream.VideoStream, error) {
+	camStream, err := of.cam.Stream(ctx, errHandlers...)
 	if err != nil {
 		return nil, err
 	}
-	return filterStream{camStream, fc}, nil
+	return filterStream{camStream, of}, nil
 }
 
 type filterStream struct {
 	cameraStream gostream.VideoStream
-	fc           *filterCamera
+	fc           *objectFilter
 }
 
 // Gets the next image from the image stream
@@ -154,7 +154,7 @@ func newCamera(ctx context.Context, deps resource.Dependencies, conf resource.Co
 	if err != nil {
 		return nil, err
 	}
-	fc := &filterCamera{name: conf.ResourceName(), conf: newConf, logger: logger}
+	fc := &objectFilter{name: conf.ResourceName(), conf: newConf, logger: logger}
 	fc.cam, err = camera.FromDependencies(deps, newConf.Camera)
 	if err != nil {
 		return nil, err
@@ -172,10 +172,10 @@ func newCamera(ctx context.Context, deps resource.Dependencies, conf resource.Co
 }
 
 // DoCommand allows changing the vision service to be used dynamically
-func (fc *filterCamera) DoCommand(ctx context.Context, cmd map[string]interface{}) (map[string]interface{}, error) {
+func (of *objectFilter) DoCommand(ctx context.Context, cmd map[string]interface{}) (map[string]interface{}, error) {
 	val, ok := cmd["vision-service"].(string)
 	if ok {
-		fc.vis = fc.visServices[val]
+		of.vis = of.visServices[val]
 		return map[string]interface{}{"result": fmt.Sprintf("Vision service changed to: %s", val)}, nil
 	}
 	return nil, fmt.Errorf("vision service could not be changed to: %s", val)
