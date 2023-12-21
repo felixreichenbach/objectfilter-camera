@@ -21,7 +21,7 @@ import (
 )
 
 func init() {
-	resource.RegisterComponent(camera.API, Model, resource.Registration[camera.Camera, *Config]{Constructor: newCamera})
+	resource.RegisterComponent(camera.API, Model, resource.Registration[camera.Camera, *Config]{Constructor: newObjectFilter})
 }
 
 var Model = resource.NewModel("felixreichenbach", "camera", "objectfilter")
@@ -61,14 +61,37 @@ type objectFilter struct {
 	conf   *Config
 	logger logging.Logger
 
-	cam         camera.Camera
-	vis         vision.Service
-	visServices map[string]vision.Service
+	camera         camera.Camera
+	visionService  vision.Service
+	visionServices map[string]vision.Service
+}
+
+// Constructor for the object filter camera
+func newObjectFilter(ctx context.Context, deps resource.Dependencies, conf resource.Config, logger logging.Logger) (camera.Camera, error) {
+	newConf, err := resource.NativeConfig[*Config](conf)
+	if err != nil {
+		return nil, err
+	}
+	fc := &objectFilter{name: conf.ResourceName(), conf: newConf, logger: logger}
+	fc.camera, err = camera.FromDependencies(deps, newConf.Camera)
+	if err != nil {
+		return nil, err
+	}
+	fc.visionServices = make(map[string]vision.Service)
+	for _, visionService := range newConf.VisionServices {
+		fc.logger.Infof("VISION_SERVICE: %s", visionService)
+		fc.visionServices[visionService], err = vision.FromDependencies(deps, visionService)
+		if err != nil {
+			return nil, err
+		}
+	}
+	fc.visionService = fc.visionServices[newConf.VisionServices[0]]
+	return fc, nil
 }
 
 // Returns the unfiltered source camera images
 func (of *objectFilter) Images(ctx context.Context) ([]camera.NamedImage, resource.ResponseMetadata, error) {
-	images, meta, err := of.cam.Images(ctx)
+	images, meta, err := of.camera.Images(ctx)
 	if err != nil {
 		return images, meta, err
 	}
@@ -82,12 +105,12 @@ func (*objectFilter) NextPointCloud(ctx context.Context) (pointcloud.PointCloud,
 
 // TODO: What does this API do?
 func (of *objectFilter) Projector(ctx context.Context) (transform.Projector, error) {
-	return of.cam.Projector(ctx)
+	return of.camera.Projector(ctx)
 }
 
 // Returns the camera's supported properties
 func (of *objectFilter) Properties(ctx context.Context) (camera.Properties, error) {
-	p, err := of.cam.Properties(ctx)
+	p, err := of.camera.Properties(ctx)
 	if err == nil {
 		p.SupportsPCD = false
 	}
@@ -96,11 +119,11 @@ func (of *objectFilter) Properties(ctx context.Context) (camera.Properties, erro
 
 // The camera image stream
 func (of *objectFilter) Stream(ctx context.Context, errHandlers ...gostream.ErrorHandler) (gostream.VideoStream, error) {
-	camStream, err := of.cam.Stream(ctx, errHandlers...)
+	cameraStream, err := of.camera.Stream(ctx, errHandlers...)
 	if err != nil {
 		return nil, err
 	}
-	return filterStream{camStream, of}, nil
+	return filterStream{cameraStream, of}, nil
 }
 
 type filterStream struct {
@@ -115,7 +138,7 @@ func (fs filterStream) Next(ctx context.Context) (image.Image, func(), error) {
 		return nil, nil, err
 	}
 	// Provide image to vision service and get object detections
-	detections, err := fs.fc.vis.Detections(ctx, image, nil)
+	detections, err := fs.fc.visionService.Detections(ctx, image, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -148,34 +171,11 @@ func (fs filterStream) Close(ctx context.Context) error {
 	return fs.cameraStream.Close(ctx)
 }
 
-// Constructor for the object filter camera
-func newCamera(ctx context.Context, deps resource.Dependencies, conf resource.Config, logger logging.Logger) (camera.Camera, error) {
-	newConf, err := resource.NativeConfig[*Config](conf)
-	if err != nil {
-		return nil, err
-	}
-	fc := &objectFilter{name: conf.ResourceName(), conf: newConf, logger: logger}
-	fc.cam, err = camera.FromDependencies(deps, newConf.Camera)
-	if err != nil {
-		return nil, err
-	}
-	fc.visServices = make(map[string]vision.Service)
-	for _, visionService := range newConf.VisionServices {
-		fc.logger.Infof("VISION_SERVICE: %s", visionService)
-		fc.visServices[visionService], err = vision.FromDependencies(deps, visionService)
-		if err != nil {
-			return nil, err
-		}
-	}
-	fc.vis = fc.visServices[newConf.VisionServices[0]]
-	return fc, nil
-}
-
 // DoCommand allows changing the vision service to be used dynamically
 func (of *objectFilter) DoCommand(ctx context.Context, cmd map[string]interface{}) (map[string]interface{}, error) {
 	val, ok := cmd["vision-service"].(string)
 	if ok {
-		of.vis = of.visServices[val]
+		of.visionService = of.visionServices[val]
 		return map[string]interface{}{"result": fmt.Sprintf("Vision service changed to: %s", val)}, nil
 	}
 	return nil, fmt.Errorf("vision service could not be changed to: %s", val)
