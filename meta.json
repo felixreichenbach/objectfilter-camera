@@ -10,6 +10,7 @@
     }
   ],
   "build": {
+    "setup": "./setup.sh",
     "build": "make module.tar.gz",
     "arch" : ["darwin/arm64", "linux/arm64"]
   },
