@@ -5,3 +5,4 @@ build/mysensor
 notes.txt
 bin/objectfilter
 .venv/
+*.tar.gz
