@@ -7,6 +7,9 @@ You can also find the module in the Viam registry directly: [https://app.viam.co
 
 ## Component Attributes Configuration
 
+> [!WARNING]
+> This module is deprecated! Please use this module instead: [filtered-camera module](https://app.viam.com/module/viam/filtered-camera)
+
 ```
         "camera": "<-Your Source Camera Name->",
         "labels": ["<-The Label(s) You Are Looking For->"],
