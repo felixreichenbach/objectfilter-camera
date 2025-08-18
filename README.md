@@ -1,14 +1,14 @@
 # Viam Object Filter Camera
 
+> [!WARNING]
+> This module is deprecated! Please use this module instead: [filtered-camera module](https://app.viam.com/module/viam/filtered-camera)
+
 This camera module implements a Viam camera interface which filters objects returned by an object detection ML model based upon the label and confidence threshold you set.
 You can find information regarding how to deploy Viam modules on to your smart machine in the [Viam documentation](https://docs.viam.com/registry/#use-modules)
 
 You can also find the module in the Viam registry directly: [https://app.viam.com/module/felixreichenbach/object-filter](https://app.viam.com/module/felixreichenbach/object-filter)
 
 ## Component Attributes Configuration
-
-> [!WARNING]
-> This module is deprecated! Please use this module instead: [filtered-camera module](https://app.viam.com/module/viam/filtered-camera)
 
 ```
         "camera": "<-Your Source Camera Name->",
